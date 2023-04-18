@@ -7,7 +7,9 @@
 Here's an interavtive FLAME model viewer created with PyVista. Several slider bars are added to allow user to adjust parameters of FLAME model. The code uses Python 3.8 and is tested on PyTorch 2.0.0+cu117.
 
 ### Installation
+You can create a model folder in the root folder of this project and install all requirements of toyTask by running following commands from the terminal.
 ```
+mkdir model
 cd toyTask
 pip install -r requirements.txt
 ```
