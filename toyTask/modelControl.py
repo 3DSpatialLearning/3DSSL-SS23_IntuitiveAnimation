@@ -11,16 +11,17 @@ flamelayer.cuda()
 
 # forward pass of FLAME, from parameters to mesh
 def createMesh(shape_params, expression_params, pose_params):
-    vertice, _ = flamelayer(shape_params, expression_params, pose_params)
+    vertice, landmarks = flamelayer(shape_params, expression_params, pose_params)
     faces = np.hstack(np.insert(flamelayer.faces, 0, values=3, axis=1))
     vertices = vertice[0].detach().cpu().numpy().squeeze()
+    landmarks = landmarks[0].detach().cpu().numpy().squeeze()
     mesh = pv.PolyData(vertices, faces)
-    return mesh
+    return mesh, landmarks
 
 class ModelControl:
-    def __init__(self, mesh):
+    def __init__(self, mesh, landmarks):
         self.output = mesh
-
+        self.landmarks = landmarks
         self.kwargs = {
             'rotation_1': 0.0,
             'rotation_2': 0.0,
@@ -99,6 +100,7 @@ class ModelControl:
 
         # Cerating expression parameters
         self.expression_params = torch.hstack((self.customExpression, torch.zeros(1, 40, dtype=torch.float32))).cuda()
-        result = createMesh(self.shape_params, self.expression_params, self.pose_params)
+        result, landmarks = createMesh(self.shape_params, self.expression_params, self.pose_params)
         self.output.copy_from(result)
+        self.landmarks = landmarks
         return
