@@ -1,5 +1,23 @@
 # 3DSSL-SS23_IntuitiveAnimation
 
+## First attempt: Re-fitting landmarks with FLAME
+<div align=center><img src="images/transform.png" alt="drawing" width="90%"/></div>
+
+This approch fits FLAME model to 51 landmarks of human face. User can adjust landmarks in pyVista viewer via dragging and see a deformed face.
+
+Performance is poor since it takes a lot of time to fit FLAME model to landmarks. Won't be an option for practical use.
+
+### Requirements
+The requirements are exactly the same with toy task except pyTorch.
+
+### Running
+Before running this demo, please follow the installation step and download models as suggested in toy task below.
+
+Then make sure that you are in "refit" folder and run
+```
+python refit.py
+```
+
 ## Interactive FLAME model viewer (Toy Task)
 
 <div align=center><img src="images/viewer.png" alt="drawing" width="50%"/></div>
