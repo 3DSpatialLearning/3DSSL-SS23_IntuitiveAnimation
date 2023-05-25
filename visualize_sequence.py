@@ -49,6 +49,7 @@ for frame_idx, mesh_fname in enumerate(sequence_fnames):
     sequence_vertices.append(frame.v)
     if f is None:
         f = frame.f
+print(sequence_vertices[0])
 template = Mesh(sequence_vertices[0], f)
 sequence_vertices = np.stack(sequence_vertices)
 render_sequence_meshes(audio_fname, sequence_vertices, template, out_path, uv_template_fname=uv_template_fname, texture_img_fname=texture_img_fname)

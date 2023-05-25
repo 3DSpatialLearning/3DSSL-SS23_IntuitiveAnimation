@@ -143,7 +143,7 @@ def alter_sequence_shape(source_path, out_path, flame_model_fname, pc_idx=0, pc_
     x2, y2 = [num_frames/2, num_frames], pc_range[::-1]
 
     xsteps1 = np.arange(0, num_frames/2)
-    xsteps2 = np.arange(num_frames/2, num_frames)
+    xsteps2 = np.arange(num_frames/2, num_frames-1)
 
     model_parms[:, pc_idx] = np.hstack((np.interp(xsteps1, x1, y1), np.interp(xsteps2, x2, y2)))
 
@@ -193,12 +193,23 @@ def alter_sequence_head_pose(source_path, out_path, flame_model_fname, pose_idx=
     xsteps1 = np.arange(0, num_frames//4)
     xsteps2 = np.arange(num_frames//4, num_frames/2)
     xsteps3 = np.arange(num_frames//2, 3*num_frames//4)
-    xsteps4 = np.arange(3*num_frames//4, num_frames)
+    xsteps4 = np.arange(3*num_frames//4, num_frames-1)
 
-    model_parms[:, pose_idx] = np.hstack((np.interp(xsteps1, x1, y1),
-                                   np.interp(xsteps2, x2, y2),
-                                   np.interp(xsteps3, x3, y3),
-                                   np.interp(xsteps4, x4, y4)))
+    print(f'xsteps4: {xsteps3, len(xsteps3)}\nx4: {x3}\ny4: {x3}')
+    
+    x1p = np.interp(xsteps1, x1, y1)
+    x2p = np.interp(xsteps2, x2, y2)
+    x3p = np.interp(xsteps3, x3, y3)
+    x4p = np.interp(xsteps4, x4, y4)
+
+    print(f'shapes: {x1p.shape, x2p.shape, x3p.shape, x4p.shape}')
+    print(model_parms[:, pose_idx].shape)
+
+    test_array = np.hstack((x1p, x2p, x3p, x4p))
+
+    print(f'test_array: {test_array.shape}')
+
+    model_parms[:, pose_idx] = np.hstack((x1p, x2p, x3p, x4p))
 
     predicted_vertices = np.zeros((num_frames, model.v_template.shape[0], model.v_template.shape[1]))
 
