@@ -9,21 +9,21 @@ def updateParameter(parameter, value, plotter):
     engine(parameter, value)
     # showLandmarks(engine.output.points, engine.landmarks, plotter)
 
-def updateMesh(point, i):
-    starting_mesh.points[i] = point
+# def updateMesh(point, i):
+#     starting_mesh.points[i] = point
 
-def showLandmarks(points, landmarks, plotter):
-    # plotter.clear_sphere_widgets()
-    distances = np.sqrt(np.sum((points[:, np.newaxis] - landmarks) ** 2, axis=2))
-    indices = np.argmin(distances, axis=0)
-    for i in indices:
-        plotter.add_sphere_widget(
-            callback=lambda point, idx = i: updateMesh(point, idx), 
-            color="red", 
-            radius=0.001, 
-            center=engine.output.points[i],
-            test_callback = False
-        )
+# def showLandmarks(points, landmarks, plotter):
+#     # plotter.clear_sphere_widgets()
+#     distances = np.sqrt(np.sum((points[:, np.newaxis] - landmarks) ** 2, axis=2))
+#     indices = np.argmin(distances, axis=0)
+#     for i in indices:
+#         plotter.add_sphere_widget(
+#             callback=lambda point, idx = i: updateMesh(point, idx), 
+#             color="red", 
+#             radius=0.001, 
+#             center=engine.output.points[i],
+#             test_callback = False
+#         )
 
 # creating initial parameters
 shape_params_init = torch.zeros(1, 100).cuda()
@@ -57,7 +57,7 @@ pv.global_theme.slider_styles.modern.tube_width = 0.02
 # indices = np.where(np.isin(engine.output.points, engine.landmarks).all(axis=1))[0]
 
 
-showLandmarks(engine.output.points, engine.landmarks, p)
+# showLandmarks(engine.output.points, engine.landmarks, p)
 
 # adding sliders for jaws
 p.add_slider_widget(
