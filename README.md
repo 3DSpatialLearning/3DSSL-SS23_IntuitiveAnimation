@@ -1,5 +1,18 @@
 # 3DSSL-SS23_IntuitiveAnimation
 
+## EmoFormer: A Transformer-based Audio Driven Face Animation Network with Emotion
+<div align=center><img src="images/Change_Emotion.gif" alt="drawing" width="90%"/><p>EmoFormer prediction of a single audio recording with manually added emotion</p></div>
+
+The EmoFormer uses a transformer-based encoder decoder structure to achieve the audio driven face animation with emotion. The output mesh is based on FLAME model.
+
+The network are based on a encoder-decoder structure. The input audio sequence are firstly processed with Wav2Vec feature extractor and its content and emotion features are then extracted with content encoder and emotion encoder respectively. The content feature is a time sequence while the emotion feature is time invariant and extracted from the whole audio sequence. These features are then feed into a transformer decoder with one decoder layer. The final output of the network is a tracked mesh based on FLAME.
+
+### Requirements
+- Install the required python packages in `requirements.txt`
+- ffmpeg
+- [MPI-IS/mesh](https://github.com/MPI-IS/mesh)
+
+
 ## First attempt: Re-fitting landmarks with FLAME
 <div align=center><img src="images/transform.png" alt="drawing" width="90%"/></div>
 

@@ -8,6 +8,8 @@
 /*/*.npy
 /*/tests
 /*/test
+/*.npy
+/01
 
 /dataProcessing/tracking
 
@@ -17,3 +19,6 @@
 /emoFormer/wav
 /emoFormer/result
 /emoFormer/train_e2e_10
+
+/emoFormer/own_audio_for_testing
+/emoFormer/results_own_audio

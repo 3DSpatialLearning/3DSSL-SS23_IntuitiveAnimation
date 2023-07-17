@@ -140,7 +140,7 @@ def main():
 
     # Test arguments
     parser.add_argument("--wav_path", type=str, default="wav/*.wav", help="path to the test audio, for multiple inputs, use *.wav")
-    parser.add_argument("--model_path", type=str, default="save/vertices_output_01/25_model.pth", help="path to the saved model")
+    parser.add_argument("--model_path", type=str, default="/mnt/hdd/emoFormer/save/train_RAVDESS_e2e_no_pretrain_vertices_out/100_model.pth", help="path to the saved model")
     parser.add_argument("--result_path", type=str, default="result", help='path to save the predictions')
     parser.add_argument("--save_videos", type=bool, default=True, help="If true save rendered video")
     parser.add_argument("--save_mesh", type=bool, default=True, help="If true save predicted mesh")
