@@ -18,6 +18,14 @@ Then make sure that you are in "refit" folder and run
 python refit.py
 ```
 
+### Pretrain
+We used cross reconstruction to train the encoder and decoder separately earlier, which is proved to be a failed solution. If you want to train this network in this way, please run:
+
+```
+cd ./Pretrain/EmoFormer/
+python train.py
+```
+
 ## Interactive FLAME model viewer (Toy Task)
 
 <div align=center><img src="images/viewer.png" alt="drawing" width="50%"/></div>
