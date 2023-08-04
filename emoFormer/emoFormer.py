@@ -13,6 +13,15 @@ def normalization(input_tensor):
         return (input_tensor - torch.min(input_tensor)) / (torch.max(input_tensor) - torch.min(input_tensor))
     else:
         return input_tensor
+    
+def get_emo_label(file_path):
+    file_split = file_path.split("/")
+    file_name = file_split[-1].split("-")
+
+    content = file_name[4]
+    emotion = file_name[2]
+    emotion = int(emotion) - 1
+    return content, emotion
 
 # Temporal Bias, inspired by ALiBi: https://github.com/ofirpress/attention_with_linear_biases
 def init_biased_mask(n_head, max_seq_len, period):
@@ -80,6 +89,7 @@ class EmoFormer(nn.Module):
         self.encoder.train(True)
         self.feature_dim = args.feature_dim
         self.parameter_dim = args.parameter_dim
+        self.emo = args.emo
         # self.audio_encoder = Wav2Vec2Model.from_pretrained("facebook/wav2vec2-base-960h")
         # wav2vec 2.0 weights initialization
         # self.audio_encoder.feature_extractor._freeze_parameters()
@@ -91,8 +101,10 @@ class EmoFormer(nn.Module):
         self.PPE = PeriodicPositionalEncoding(args.feature_dim, period = args.period)
         self.motion_encoder = nn.Linear(args.parameter_dim, args.feature_dim)
         self.motion_decoder = nn.Linear(args.feature_dim, args.parameter_dim)
-
         
+        if self.emo == True:
+            self.emo_loss = nn.CrossEntropyLoss()
+
         nn.init.constant_(self.motion_decoder.weight, 0)
         nn.init.constant_(self.motion_decoder.bias, 0)
         
@@ -154,9 +166,93 @@ class EmoFormer(nn.Module):
             mesh_gt, _ = flame(shape_gt, expr_gt, pose_gt)
             mesh_gt = mesh_gt.reshape(frame_num, 15069)
             loss = criterion(params_output, mesh_gt)
-
-        return loss
+            
+        if self.emo == True:
+            _, emo = get_emo_label(audio[0])
+            emo = torch.tensor(emo)
+            emo = emo.unsqueeze(0)
+            emo = emo.cuda()
+            # print(emotion_feature.get_device(), emo.get_device())
+            
+            loss_emo = self.emo_loss(emotion_feature, emo)
+        
+        else:
+            loss_emo = torch.tensor(0)
+            
+        loss_dict = {}
+        loss_dict["loss"] = loss
+        loss_dict["loss_emo"] = loss_emo
+        
+        return loss_dict
     
+    def forward_en(self, audio, params, criterion):
+        # print(f"input.shape{vertice.shape}")
+        frame_num = params.shape[1]
+        content_feature, emotion_feature = self.encoder(audio[0])
+        emotion_embedding = self.emotion_vector(emotion_feature)
+        content_feature_int = linear_interpolation(content_feature, 50, 30, frame_num)
+        content_feature_int = self.audio_feature_map(content_feature_int)
+        
+        return content_feature_int, emotion_embedding
+        
+    def forward_de(self, audio, params, criterion, content_feature_int, emotion_embedding):
+        frame_num = params.shape[1]
+        for t in range(frame_num):
+            if t == 0:
+                decoder_input_emb = emotion_embedding.unsqueeze(1)
+                emotion_emb = decoder_input_emb
+                decoder_input = self.PPE(emotion_emb)
+            else:
+                decoder_input = self.PPE(decoder_input_emb)
+            tgt_mask = self.biased_mask[:, :decoder_input.shape[1], :decoder_input.shape[1]].clone().detach().to(device=self.device)
+            memory_mask = enc_dec_mask(self.device, self.dataset, decoder_input.shape[1], content_feature_int.shape[1])
+            decoder_output = self.transformer_decoder(decoder_input, content_feature_int, tgt_mask=tgt_mask, memory_mask=memory_mask)
+            params_output = self.motion_decoder(decoder_output)
+            new_out = self.motion_encoder(params_output[:, -1, :]).unsqueeze(1)
+            new_out += emotion_emb
+            decoder_input_emb = torch.cat((decoder_input_emb, new_out), 1)
+
+        params_output = params_output.squeeze(0)
+        params_gt = params.squeeze(0)
+        shape_gt = params_gt[:, :100]
+        expr_gt = params_gt[:,100: 150]
+        pose_gt = params_gt[:, 150: 156]
+        self.args.batch_size = frame_num
+        if self.parameter_dim == 56:
+            expr_out = params_output[:, 0: 50]
+            jaw_pose_out = params_output[:, 53:56]
+            
+            expr_out_norm = normalization(expr_out)
+            jaw_pose_out_norm = normalization(jaw_pose_out)
+
+            expr_gt_norm = normalization(expr_gt)
+            jaw_pose_gt_norm = normalization(pose_gt[:, 3:6])
+            loss = criterion(expr_out_norm, expr_gt_norm) + 5 * criterion(jaw_pose_out_norm, jaw_pose_gt_norm)
+        else:
+            flame = FLAME(self.args)
+            flame.to(self.device)
+            mesh_gt, _ = flame(shape_gt, expr_gt, pose_gt)
+            mesh_gt = mesh_gt.reshape(frame_num, 15069)
+            loss = criterion(params_output, mesh_gt)
+            
+        if self.emo == True:
+            _, emo = get_emo_label(audio[0])
+            emo = torch.tensor(emo)
+            emo = emo.unsqueeze(0)
+            emo = emo.cuda()
+            # print(emotion_feature.get_device(), emo.get_device())
+            
+            loss_emo = self.emo_loss(emotion_feature, emo)
+        
+        else:
+            loss_emo = torch.tensor(0)
+            
+        loss_dict = {}
+        loss_dict["loss"] = loss
+        loss_dict["loss_emo"] = 1e-3 * loss_emo
+        
+        return loss_dict
+        
     def predict(self, audio):
         content_feature, emotion_feature = self.encoder(audio[0])
         content_feature_int = linear_interpolation(content_feature, 50, 30)
@@ -165,6 +261,7 @@ class EmoFormer(nn.Module):
         content_feature_int = self.audio_feature_map(content_feature_int)
         decoder_input = torch.zeros((1, 1, self.parameter_dim), device=self.device)
         decoder_input = self.motion_encoder(decoder_input)
+        
         for t in range(frame_num):
             if t == 0:
                 decoder_input_emb = emotion_embedding.unsqueeze(1)
@@ -194,3 +291,66 @@ class EmoFormer(nn.Module):
             return mesh
         
         return params_output
+    
+    def predict_emo(self, audio, emo_vector=None, emo_mid_vector=None):
+        
+        predict = {}   
+        
+        content_feature, emotion_feature = self.encoder(audio[0])
+        content_feature_int = linear_interpolation(content_feature, 50, 30)
+        
+        if emo_vector != None:
+            emotion_feature = emo_vector
+        
+        if self.emo == True:
+            predict["emotion"] = emotion_feature
+        
+        emotion_embedding = self.emotion_vector(emotion_feature)
+        
+        if emo_mid_vector != None:
+            emotion_embedding_mid = self.emotion_vector(emo_mid_vector)
+        
+        frame_num = content_feature_int.shape[1]
+        content_feature_int = self.audio_feature_map(content_feature_int)
+        decoder_input = torch.zeros((1, 1, self.parameter_dim), device=self.device)
+        decoder_input = self.motion_encoder(decoder_input)
+        
+        for t in range(frame_num):
+            if t == 0:
+                decoder_input_emb = emotion_embedding.unsqueeze(1)
+                emotion_emb = decoder_input_emb
+                decoder_input = self.PPE(emotion_emb)
+            else:
+                decoder_input = self.PPE(decoder_input_emb)
+            tgt_mask = self.biased_mask[:, :decoder_input.shape[1], :decoder_input.shape[1]].clone().detach().to(device=self.device)
+            memory_mask = enc_dec_mask(self.device, self.dataset, decoder_input.shape[1], content_feature_int.shape[1])
+            decoder_output = self.transformer_decoder(decoder_input, content_feature_int, tgt_mask=tgt_mask, memory_mask=memory_mask)
+            params_output = self.motion_decoder(decoder_output)
+            new_out = self.motion_encoder(params_output[:, -1, :]).unsqueeze(1)
+            
+            if t == frame_num // 2 and emo_mid_vector != None:
+                print(f"change vector after frame {t}")
+                emotion_emb = emotion_embedding_mid.unsqueeze(1)
+            
+            new_out += emotion_emb
+            decoder_input_emb = torch.cat((decoder_input_emb, new_out), 1)
+        
+        if self.parameter_dim == 56:
+            params_output = params_output.squeeze(0)
+            shape = torch.zeros((frame_num, 100),device=self.device)
+            expr_out = params_output[:, :50]
+            pose_out = params_output[:, 50:56]
+            self.args.batch_size = frame_num
+            flame = FLAME(self.args)
+            flame.to(self.device)
+            mesh, _ = flame(shape, expr_out, pose_out)
+            mesh.reshape(1, frame_num, 15069)
+            
+            predict["mesh"] = mesh
+
+            return predict
+            # return mesh
+            
+        predict["params_output"] = params_output
+        return predict
+        # return params_output

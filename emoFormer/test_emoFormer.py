@@ -11,7 +11,38 @@ from psbody.mesh import Mesh
 import glob
 from emoFormer import EmoFormer
 import torch
+import random
 
+def file_with_other_emo(abs_path):
+    "/home/yuxinguo/data/RAVDESS/Audio_Speech_Actors_01-24/Actor_01/03-01-03-01-01-01-01.wav"
+    emo_list = ["01", "02", "03", "04", "05", "06", "07", "08"]
+    
+    file_path_split = abs_path.split("/")
+    name_split = file_path_split[-1].split("-")
+    
+    e1 = name_split[2]
+    itensity = name_split[3]
+    
+    e2 = e1
+
+    if itensity == "02":
+        while (e2 == e1 or e2 == "01"): 
+            e2 = random.choice(emo_list)
+        
+    else:
+        while e2 == e1:
+            e2 = random.choice(emo_list)
+    
+    e2 = "03"
+    
+    name_split[2] = e2
+    name = "-".join(name_split)
+    
+    file_path_split[-1] = name
+    file_path = "/".join(file_path_split)
+    
+    return file_path, e1, e2
+    
 def render_mesh_helper(args,mesh, t_center, rot=np.zeros(3), tex_img=None,  z_offset=0):
     if args.dataset == "BIWI":
         camera_params = {'c': np.array([400, 400]),
@@ -150,6 +181,9 @@ def main():
     parser.add_argument("--render_template_path", type=str, default="../model/FLAME_sample.ply", help='path of the mesh in FLAME/BIWI topology')
     parser.add_argument('--background_black', type=bool, default=True, help='whether to use black background')
     parser.add_argument('--fps', type=int,default=30, help='frame rate - 30 for vocaset; 25 for BIWI')
+    
+    parser.add_argument("--emo", type=bool, default=False, help="test see if the model capture emotion")
+    parser.add_argument("--emo_switch", type=bool, default=False, help="emotion switch test")
 
     args = parser.parse_args()
 
@@ -161,12 +195,49 @@ def main():
     print(f"Loading render template {args.render_template_path}")
     template = Mesh(filename=args.render_template_path)
     result_path = args.result_path
+    
+    if args.emo_switch == True:
+        
+        wavs_list = []
+        wavs_list.append(wavs[0])
+        
+        wav_other, e1, e2 = file_with_other_emo(wavs[0])
+        
+        wavs_list.append(wav_other)
+        wavs = wavs_list
+        
+        subname = f"{e1}-{e2}"
+        
+        result_path = os.path.join(result_path, subname)
+        
     if not os.path.exists(result_path):
         os.makedirs(result_path)
+    
+    
+    tmp = {}
+    tmp["file"] = []
+    tmp["wav"] = []
+    tmp["emo"] = []
+    
+    print("2 files:", wavs)
+    
     for wav in wavs:
+        
         filename = os.path.basename(wav).split(".")[0]
-        pred = model.predict((wav,)).detach().cpu().squeeze(0).numpy()
-        pred = pred.reshape(-1,5023,3)
+        
+        if args.emo == False:
+            pred = model.predict_emo((wav,)).detach().cpu().squeeze(0).numpy()
+            pred = pred.reshape(-1,5023,3)
+        else:
+            pred = model.predict_emo((wav,))
+            pred_emo = pred["emotion"]
+            pred = pred["params_output"].detach().cpu().squeeze(0).numpy()
+            pred = pred.reshape(-1,5023,3)
+            
+            if args.emo_switch == True:
+                tmp["file"].append(filename)
+                tmp["wav"].append(wav)
+                tmp["emo"].append(pred_emo)
 
         if args.save_mesh:
             np.save(os.path.join(result_path, f"{filename}.npy"), pred)
@@ -176,9 +247,41 @@ def main():
             tex_img = None
 
             render_sequence_meshes(args, pred, template, result_path, filename, vt, ft, tex_img)
+            
+    if args.emo_switch == True:
+            
+        pred_0c_1e = model.predict_emo((tmp["wav"][0],), tmp["emo"][1])
+        # pred_0c_1e = model.predict_emo((tmp["wav"][0],), tmp["emo"][1], tmp["emo"][0])
+        pred_1c_0e = model.predict_emo((tmp["wav"][1],), tmp["emo"][0])
         
-
-
+        pred_0c_1e = pred_0c_1e["params_output"].detach().cpu().squeeze(0).numpy()
+        pred_0c_1e = pred_0c_1e.reshape(-1,5023,3)
+        
+        pred_1c_0e = pred_1c_0e["params_output"].detach().cpu().squeeze(0).numpy()
+        pred_1c_0e = pred_1c_0e.reshape(-1,5023,3)
+        
+        filename_0 = tmp['file'][0] + "_swicth"
+        filename_1 = tmp['file'][1] + "_switch"
+        
+            
+        if args.save_mesh:
+            np.save(os.path.join(result_path,f"{filename_0}.npy"), pred_0c_1e)
+            np.save(os.path.join(result_path, f"{filename_1}.npy"), pred_1c_0e)
+                
+        if args.save_videos:
+            vt, ft = None, None
+            tex_img = None
+            
+            print("filename_0:", filename_0)
+            render_sequence_meshes(args, pred_0c_1e, template, result_path, filename_0, vt, ft, tex_img)
+            
+            vt, ft = None, None
+            tex_img = None
+            
+            print("filename_1:", filename_1)
+            render_sequence_meshes(args, pred_1c_0e, template, result_path, filename_1, vt, ft, tex_img)
+            
+        
 
 if __name__ == "__main__":
     main()

@@ -24,6 +24,7 @@ class EmotionEncoder(nn.Module):
         
         x = torch.mean(x, dim=1)
         x = self.projector(x)
+        x = torch.tanh(x)
         x = self.classifier(x)
         
         return x

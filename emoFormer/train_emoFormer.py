@@ -8,49 +8,137 @@ import os
 import argparse
 from torch.utils.tensorboard import SummaryWriter
 
-
-
 def train(args, model, train_loader, val_loader, optimizer, criterion):
     writer = SummaryWriter(f"runs/{args.run_name}")
     if not os.path.exists(os.path.join(args.save_path, args.run_name)):
         os.makedirs(os.path.join(args.save_path, args.run_name))
 
     iteration = 0
-    for e in range(args.max_epochs):
-        model.train()
-        loss_log = []
-        pbar = tqdm(enumerate(train_loader),total=len(train_loader))
-        # train
-        for i, (name, audio, params) in pbar:
-            iteration += 1
-            audio, params = audio, params.to(args.device)
-            loss = model(audio, params, criterion, teacher_forcing = False)
-            loss.backward()
-            loss_log.append(loss.item())
-            if i % args.gradient_accumulation_steps==0:
-                optimizer.step()
-                optimizer.zero_grad()
+    
+    cross = False
+    if cross == True:
+        for e in range(args.max_epochs):
+            model.train()
+            loss_org_log = []
+            loss_con_log = []
+            loss_emo_log = []
+            pbar = tqdm(enumerate(train_loader),total=len(train_loader))
+            
+            for i, (name_cross, audio_cross, params_cross) in pbar:
+                iteration += 1
+                print(type(audio_cross), type(params_cross))
+                for audio, params in zip(audio_cross, params_cross):
+                    audio, params = audio.to(args.device), params.to(args.device)
+                    
+                    # aa, ba, ab - org, con, emo
+                    
+                ca_aa, ea_aa = model.forward_en(audio[0], params[0], criterion)
+                cb_ba, ea_ba = model.forward_en(audio[1], params[1], criterion)
+                ca_ab, eb_ab = model.forward_en(audio[2], params[2], criterion)
+                    
+                loss_org = model.forward_de(_, params[0], criterion, ca_aa, ea_aa)
+                loss_con = model.forward_de(_, params[1], criterion, cb_ba, ea_aa)
+                loss_emo = model.forward_de(_, params[2], criterion, ca_aa, eb_ab)
+                    
+                loss_sum = sum(loss_org.values()) + sum(loss_con.values()) + sum(loss_emo.values())
+                loss_sum.backward()
+                    
+                loss_org_log.append(loss_org.item())
+                loss_con_log.append(loss_con.item())
+                loss_emo_log.append(loss_emo.item())
+                    
+                if i % args.gradient_accumulation_steps==0:
+                    optimizer.step()
+                    optimizer.zero_grad()
+                        
+                pbar.set_description(f"(Epoch {e+1}, iteration {iteration}), con_loss:{np.mean(loss_con_log):.7f}, emo_loss:{np.mean(loss_emo_log):.7f}, org_loss:{np.mean(loss_emo_log):.7f}")
+                
+            writer.add_scalar("con_loss", np.mean(loss_con_log), e+1)
+            writer.add_scalar("emo_loss", np.mean(loss_emo_log), e+1)
+            writer.add_scalar("org_loss", np.mean(loss_org_log), e+1)
+                
+                # validation
+            val_loss_log = []
+            val_emo_loss_log = []
+            
+            model.eval()
+            for name, audio, params in val_loader:
+                audio, params = audio, params.to(args.device)
+                loss_dict = model(audio, params, criterion, teacher_forcing = False)
+                
+                loss = loss_dict["loss"]
+                loss_emo = loss_dict["loss_emo"]
+                
+                val_loss_log.append(loss.item())
+                val_emo_loss_log.append(loss_emo.item())
+            
+            val_loss = np.mean(val_loss_log)
+            val_emo_loss = np.mean(val_emo_loss_log)
 
-            pbar.set_description(f"(Epoch {e+1}, iteration {iteration}) Train_loss:{np.mean(loss_log):.7f}")
+            if (e > 0 and (e + 1) % args.save_epoch == 0) or e == args.max_epochs - 1:
+                torch.save(model.state_dict(), os.path.join(args.save_path, args.run_name, f"{e+1}_model.pth"))
 
-        writer.add_scalar("train_loss", np.mean(loss_log), e+1)
+            print(f"Epoch: {e+1}, val_loss: {val_loss:.7f}")
+            print(f"Epoch: {e+1}, val_emo_loss: {val_emo_loss:.7f}")
 
-        # validation
-        val_loss_log = []
-        model.eval()
-        for name, audio, params in val_loader:
-            audio, params = audio, params.to(args.device)
-            loss = model(audio, params, criterion, teacher_forcing = False)
-            val_loss_log.append(loss.item())
+            writer.add_scalar("validation_loss", val_loss, e+1)
+            writer.add_scalar("validation_emo_loss", val_emo_loss, e+1)
+                    
+    else:
+        for e in range(args.max_epochs):
+            model.train()
+            loss_log = []
+            loss_emo_log = []
+            pbar = tqdm(enumerate(train_loader),total=len(train_loader))
+            # train
+            for i, (name, audio, params) in pbar:
+                iteration += 1
+                audio, params = audio, params.to(args.device)
+                loss_dict = model(audio, params, criterion, teacher_forcing = False)
+                loss_sum = sum(loss_dict.values())
+                loss = loss_dict["loss"]
+                loss_emo = loss_dict["loss_emo"]
+                
+                loss_sum.backward()
+                loss_log.append(loss.item())
+                loss_emo_log.append(loss_emo.item())
+                
+                if i % args.gradient_accumulation_steps==0:
+                    optimizer.step()
+                    optimizer.zero_grad()
+
+                pbar.set_description(f"(Epoch {e+1}, iteration {iteration}) Train_emo_loss:{np.mean(loss_emo_log):.7f}, Train_loss:{np.mean(loss_log):.7f}")
+
+            writer.add_scalar("train_loss", np.mean(loss_log), e+1)
+            writer.add_scalar("train_emo_loss", np.mean(loss_emo_log), e+1)
+
+            # validation
+            val_loss_log = []
+            val_emo_loss_log = []
+            
+            model.eval()
+            for name, audio, params in val_loader:
+                audio, params = audio, params.to(args.device)
+                loss_dict = model(audio, params, criterion, teacher_forcing = False)
+                
+                loss = loss_dict["loss"]
+                loss_emo = loss_dict["loss_emo"]
+                
+                val_loss_log.append(loss.item())
+                val_emo_loss_log.append(loss_emo.item())
+            
+            val_loss = np.mean(val_loss_log)
+            val_emo_loss = np.mean(val_emo_loss_log)
+
+            if (e > 0 and (e + 1) % args.save_epoch == 0) or e == args.max_epochs - 1:
+                torch.save(model.state_dict(), os.path.join(args.save_path, args.run_name, f"{e+1}_model.pth"))
+
+            print(f"Epoch: {e+1}, val_loss: {val_loss:.7f}")
+            print(f"Epoch: {e+1}, val_emo_loss: {val_emo_loss:.7f}")
+
+            writer.add_scalar("validation_loss", val_loss, e+1)
+            writer.add_scalar("validation_emo_loss", val_emo_loss, e+1)
         
-        val_loss = np.mean(val_loss_log)
-
-        if (e > 0 and (e + 1) % args.save_epoch == 0) or e == args.max_epochs - 1:
-            torch.save(model.state_dict(), os.path.join(args.save_path, args.run_name, f"{e+1}_model.pth"))
-
-        print(f"Epoch: {e+1}, val_loss: {val_loss:.7f}")
-
-        writer.add_scalar("validation_loss", val_loss, e+1)
     writer.close()
     return model
 
@@ -90,7 +178,8 @@ def main():
     parser.add_argument("--num_data", type=int, default=1000, help="numbers of data used for dataloader")
     parser.add_argument("--device", type=str, default="cuda", help="cuda for gpu, cpu for cpu")
     parser.add_argument("--save_epoch", type=int, default=5, help="save the model after every n epochs")
-
+    parser.add_argument("--emo", type=bool, default=False, help="test see if the model capture emotion")
+    
     args = parser.parse_args()
 
     dataloader = load_data(args.npz_path, args.wav_path, args.num_data)
