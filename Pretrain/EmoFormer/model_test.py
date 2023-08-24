@@ -27,7 +27,6 @@ print(input.shape)
 
 model1 = Wav2Vec2Model.from_pretrained("lighteternal/wav2vec2-large-xlsr-53-greek")
 model2 = Wav2Vec2Model.from_pretrained("jonatasgrosman/wav2vec2-large-xlsr-53-english")
-# 上面两个模型完全相同，只有 dropout 不一样
 model3 = Wav2Vec2Model.from_pretrained("ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition")
 model4 = AutoModelForAudioClassification.from_pretrained("ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition") 
 
@@ -44,5 +43,5 @@ print(type(code), code.last_hidden_state.shape)
 # print("1", model1)
 # print("2", model2)
 # print("3", model3)
-# print("4", model4) # model 4 加了一个projector 和 classifier
+# print("4", model4) 
 
