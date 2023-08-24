@@ -156,7 +156,7 @@ class VOCAModel(BaseModel):
             return 0.0
 
     def _init_training(self):
-        self.global_step = tf.Variable(0, name='global_step', trainable=False)
+        self.global_step = tf.Variable(0, name='global_step', trainable=True)
         decay_steps = self.batcher.get_training_size()//self.config['batch_size']
         decay_rate = self.config['decay_rate']
         if decay_rate < 1:
@@ -185,11 +185,11 @@ class VOCAModel(BaseModel):
             for iter in range(num_train_batches):
                 loss, g_step, summary, g_lr = self._training_step()
                 if iter % 50 == 0:
-                    logging.warning("Epoch: %d | Iter: %d | Global Step: %d | Loss: %.6f | Learning Rate: %.6f" % (epoch, iter, g_step, loss, g_lr))
+                    logging.warning("Epoch: %d | Iter: %d | Global Step: %d | Loss: %.9f | Learning Rate: %.6f" % (epoch, iter, g_step, loss, g_lr))
                     self.train_writer.add_summary(summary, g_step)
                 if iter % 100 == 0:
                     val_loss, val_summary = self._validation_step()
-                    logging.warning("Validation loss: %.6f" % val_loss)
+                    logging.warning("Validation loss: %.12f" % val_loss)
                     self.validation_writer.add_summary(val_summary, g_step)
 
             if epoch % 10 == 0:
@@ -200,6 +200,8 @@ class VOCAModel(BaseModel):
                                        , data_specifier='training')
                 self._render_sequences(out_folder=os.path.join(self.config['checkpoint_dir'], 'videos', 'validation_epoch_%d_iter_%d' % (epoch, iter))
                                        , data_specifier='validation')
+                
+        print("returning after training")
 
     def _training_step(self):
         processed_audio, vertices, templates, subject_idx = self.batcher.get_training_batch(self.config['batch_size'])

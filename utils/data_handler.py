@@ -181,7 +181,7 @@ class DataHandler:
 
         print("Loading raw audio")
         self.raw_audio = pickle.load(open(raw_audio_path, 'rb'), encoding='latin1')
-
+        #print(self.raw_audio)
         print("Process audio")
         if os.path.exists(processed_audio_path):
             self.processed_audio = pickle.load(open(processed_audio_path, 'rb'), encoding='latin1')
@@ -191,8 +191,13 @@ class DataHandler:
                 pickle.dump(self.processed_audio, open(processed_audio_path, 'wb'))
 
         print("Loading index maps")
-        self.data2array_verts = pickle.load(open(data2array_verts_path, 'rb'))
+        with open("./training_data/subj_seq_to_idx_RAVDESS.pkl", "rb") as file:
+            self.data2array_verts = pickle.load(file, encoding='latin1')
+        print(self.data2array_verts.keys())
+        #print(self.data2array_verts['Actor_01'])
+        #self.data2array_verts = pickle.load(open(data2array_verts_path, 'rb'))
         self.array2data_verts = invert_data2array(self.data2array_verts)
+        print(self.data2array_verts['Actor_01'])
         self.array2window_ids = compute_window_array_idx(self.data2array_verts, self.num_consecutive_frames)
 
     def _init_data_splits(self, subject_for_training, sequence_for_training, subject_for_validation,

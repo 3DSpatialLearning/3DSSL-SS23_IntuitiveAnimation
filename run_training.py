@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import configparser
 import tensorflow as tf
+import numpy as np
 
 from config_parser import read_config, create_default_config
 from utils.data_handler import DataHandler
@@ -77,6 +78,8 @@ def main():
         model.build_graph()
         model.load()
         model.train()
+        print("Saving model!")
+        model._save(1901)
 
 if __name__ == '__main__':
     main()
