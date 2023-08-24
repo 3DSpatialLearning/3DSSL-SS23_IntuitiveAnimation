@@ -1,5 +1,3 @@
-# 获得RAVDESS最长的文件
-
 import os
 import librosa
 
