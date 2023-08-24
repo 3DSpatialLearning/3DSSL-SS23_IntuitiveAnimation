@@ -1,6 +1,6 @@
 # [VOCA: Voice Operated Character Animation](https://voca.is.tue.mpg.de)
 
-This is an official [VOCA](https://voca.is.tue.mpg.de) repository.
+This is an extension of the official [VOCA](https://voca.is.tue.mpg.de) repository.
 
 <p align="center"> 
 <img src="gif/speech_driven_animation.gif">
@@ -23,6 +23,9 @@ You can also check out the [VOCA Blender Addon](https://github.com/SasageyoOrg/v
 See the demo video for more details and results.
 
 [![VOCA](https://img.youtube.com/vi/XceCxf_GyW4/0.jpg)](https://youtu.be/XceCxf_GyW4)
+
+While showing good approximations of the lip movements, no upper face movements and hence, no emotional expressions are achieved.
+This approach aims to overcome this limitation by first applying post-processing in a first step and retraining the pipeline on a generated dataset in a second step.
 
 ## Set-up
 
